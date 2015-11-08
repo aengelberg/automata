@@ -5,6 +5,244 @@
             [loco.automata :as a]
             [clojure.pprint :as pp]))
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+;;; SOLVING PROBLEMS WITH AUTOMATA, PART 2
+
+(def part2
+  ["How finite state machines have impacted Constraint Programming"
+   
+   "Code examples using Loco (my Constraint Programming library for Cloure)"])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+;;; WHIRLWIND TOUR OF CONSTRAINT PROGRAMMING
+
+;; - CP is a new approach to Discrete Optimization
+;; - Loco provides a Clojure DSL to "Finite-Domain Integer Constraint Programming"
+;; - Translation: only variables with *integer* values and bounded domains.
+
+;; Example problem: find all X, Y, Z in [1, 10000] where X + Y + Z = 5.
+
+(defn find-solution-slow
+  "This is inefficient."
+  []
+  (for [x (range 1 10000)
+        y (range 1 10000)
+        z (range 1 10000)
+        :when (= 5 (+ x y z))]
+    {:x x :y y :z z}))
+
+#_(find-solution-slow) ; don't even bother
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(use 'loco.core)
+(use 'loco.constraints)
+
+(defn find-solution-fast
+  "This is efficient."
+  []
+  (let [model [($in :x 1 10000)
+               ($in :y 1 10000)
+               ($in :z 1 10000)
+               ($= 5 ($+ :x :y :z))]]
+    (solutions model)))
+
+(time (find-solution-fast))
+
+;;; Propagators avoid dumb choices
+
+;; - "X + Y + Z = 5" is a *propagator*
+;; - It automagically "trims" the domains of variables
+;;   to remove impossible values
+;; - e.g. X, Y, and Z cannot be greater than 3
+
+(comment
+  ;; The initial model
+  X in [1,10000]
+  Y in [1,10000]
+  Z in [1,10000]
+  X + Y + Z = 5
+  ;; Propagation magic: we know X, Y, and Z cannot go over 3 or
+  ;; there's no way to satisfy the constraint.
+  X in [1,3]
+  Y in [1,3]
+  Z in [1,3]
+  X + Y + Z = 5
+  ;; Now we do brute-force but with a much more reasonable model.
+  ;; Case 1: X = 1
+  X in [1]
+  Y in [1,3]
+  Z in [1,3]
+  X + Y + Z = 5
+  ;; Case 1.1: Y = 1
+  X in [1]
+  Y in [1]
+  Z in [1,3]
+  X + Y + Z = 5
+  ;; Propagation magic: Z must be 3
+  X in [1]
+  Y in [1]
+  Z in [3]
+  X + Y + Z = 5
+  ;; This is a valid solution! Return this and keep going
+  ;; (backtracking if necessary).
+  )
+
+;; Key idea: Adding simple propagators in between search decisions is
+;; very powerful.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+;; CP engines traditionally provide a rich set of constraints to model
+;; problems.
+
+;; - equality / inequality
+($= :x :y) ($!= 5 :z) ($< :a 3)
+;; - logical meta-constraints
+($and ($= :x :y)
+      ($or ($< :a 3)
+           ($= :foo :baz)))
+;; - more math goodies:
+($= ($min [:a :b :c])
+    ($max [:x :y :z]))
+($= :x ($abs :y))
+
+;; GLOBAL CONSTRAINTS: advanced properties that apply to a series of
+;; variables.
+
+;; - "distinct" 
+($distinct [:x :y :z]) ; X, Y, and Z must have all different values
+;; - "nth"
+($= ($nth [1 2 3] :x) 3) ; X must be 2
+
+;; Sometimes global constraints aren't enough
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ;; See Loco's readme for an introduction to Constraint Programming.
 ;; https://github.com/aengelberg/loco#what-is-constraint-programming
 
