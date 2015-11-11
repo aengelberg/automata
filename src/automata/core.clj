@@ -6,206 +6,9 @@
             [clojure.pprint :as pp]
             [clojure.string :as str]))
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-;;; SOLVING PROBLEMS WITH AUTOMATA, PART 2
-
-(def part2
-  ["What is Constraint Programming?"
-   "The 'regular' constraint"
-   "Code examples using Loco"])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-;;; WHIRLWIND TOUR OF CONSTRAINT PROGRAMMING
-
-;; - Constraint Programming (CP) uses propagators
-;; - Loco provides a Clojure DSL to "Finite-Domain Integer Constraint Programming"
-;; - Translation: only variables with *integer* values and bounded domains.
-
-;; Example problem: find all X, Y, Z in [1, 10000] where X + Y + Z = 5.
-
-(defn find-solution-slow
-  "This is inefficient (doesn't use Constraint Programming)"
-  []
-  (for [x (range 1 10000)
-        y (range 1 10000)
-        z (range 1 10000)
-        :when (= 5 (+ x y z))]
-    {:x x :y y :z z}))
-
-#_(find-solution-slow) ; don't even bother
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-(use 'loco.core)
-(use 'loco.constraints)
-
-(defn find-solution-fast
-  "This is efficient."
-  []
-  (let [model [($in :x 1 10000)
-               ($in :y 1 10000)
-               ($in :z 1 10000)
-               ($= 5 ($+ :x :y :z))]]
-    (solutions model)))
-
-(prn (time (find-solution-fast)))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-;;; The secret: propagators
-
-;; - "X + Y + Z = 5" is a *propagator*
-;; - It automagically "trims" the domains of variables
-;;   to remove impossible values
-;; - e.g. X, Y, and Z cannot be greater than 3
-
-(comment
-  ;; The initial model
-  X in [1,10000]
-  Y in [1,10000]
-  Z in [1,10000]
-  X + Y + Z = 5
-  ;; Propagation magic: X <= 3, Y <= 3, Z <= 3
-  X in [1,3]
-  Y in [1,3]
-  Z in [1,3]
-  X + Y + Z = 5
-  ;; Now we do brute-force
-  ;; Case 1: X = 1
-  X in [1,1]
-  Y in [1,3]
-  Z in [1,3]
-  X + Y + Z = 5
-  ;; Case 1.1: Y = 1
-  X in [1,1]
-  Y in [1,1]
-  Z in [1,3]
-  X + Y + Z = 5
-  ;; Propagation magic: Z = 3
-  X in [1,1]
-  Y in [1,1]
-  Z in [3,3]
-  X + Y + Z = 5
-  ;; All variables are singleton sets. success
-  )
-
 ;; Key idea (tip of the iceberg):
 ;; search + propagation = very powerful
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-;;; MORE CONSTRAINTS
 
 ;; - equality / inequality
 ($= :x :y) ($!= 5 :z) ($< :a 3)
@@ -254,24 +57,41 @@
 
 
 
+;;; THE "REGULAR" CONSTRAINT
 
-
-
-
-;;; Check out the new "magic" constraint that can solve all your problems!
+;; Step 1: Create an automaton
 
 (require '[loco.automata :as a])
 
-(comment ($regular <...> [:x :y :z])
-         ;; fill in the blank with a finite state machine
-         )
+(def my-automaton1
+  "Convert from a regular expression"
+  (a/string->automaton "1+2+(3|4)+"))
 
-;; 
-(def example (a/string->automaton "123+"))
+(def my-automaton2
+  "Construct by hand (from a transition map)"
+  (a/map->automaton
+   {:q0 {1 :q1}
+    :q1 {1 :q1
+         2 :q2}
+    :q2 {2 :q2
+         3 :q3
+         4 :q3}
+    :q3 {3 :q3
+         4 :q3}} ; a map of transitions
+   :q0 ; a start state
+   #{:q3} ; a set of accepting states
+   ))
+
+;; Step 2: Use the $regular constraint
 
 (comment
-  (require ')
-  (prn (a/string->automaton)))
+  (solutions [($in :a 1 50)
+              ($in :b 1 50)
+              ($in :c 1 50)
+              ($in :d 1 50) ; 625,000 cases if brute force
+              ($regular my-automaton1 [:a :b :c :d])
+              ($= :c 3)])
+  => ({:a 1, :b 2, :c 3, :d 3} {:a 1, :b 2, :c 3, :d 4}))
 
 
 
@@ -294,15 +114,6 @@
 
 
 
-
-
-
-;; - Sudoku
-(comment
-  (solution [($in [:x 1 1] 1 9)
-             ($in [:x 1 2] 1 9)
-             ...
-             ($distinct [[:x 1 5]])]))
 
 (require '[loco.automata :as a])
 (def non-contiguous "0*1+0+1(0|1)*")
@@ -380,9 +191,15 @@
 (def minimum-day-shifts 3)
 (def minimum-night-shifts 2)
 
+;; VARIABLES:
+;; [:shift i j] = what kind of shift nurse i does on day j
+;; 1 = day, 2 = night, 0 = nothing
+
+;; there are 7 (nurses) * 10 (days) = 70 variables.-
+
 (def day 0)
-(def night 2)
-(def nothing 1)
+(def night 1)
+(def nothing 2)
 
 (def shift-transition-map
   {:q1 {nothing :q1
@@ -409,16 +226,20 @@
 
 (comment
   (use 'rhizome.viz)
-  (view-graph (keys shift-transition-map)
-              (into {} (for [[k v] shift-transition-map]
-                         [k (distinct (vals v))]))
-              :edge->descriptor (fn [src dest]
-                                  (let [m (shift-transition-map src)
-                                        inputs (map key (filter #(= dest (val %)) (seq m)))
-                                        inputs (map {day 'd night 'n nothing 'o} inputs)]
-                                    {:label (str/join "," inputs)}))
-              :node->descriptor (fn [n] {:label n})
-              :options {:rankdir "LR"}))
+  (view-graph
+   (keys shift-transition-map)
+   (into {} (for [[k v] shift-transition-map]
+              [k (distinct (vals v))]))
+   :edge->descriptor
+   (fn [src dest]
+     (let [m (shift-transition-map src)
+           inputs (map key (filter #(= dest (val %))
+                                   (seq m)))
+           inputs (map {day 'd night 'n nothing 'o}
+                       inputs)]
+       {:label (str/join "," inputs)}))
+   :node->descriptor (fn [n] {:label n})
+   :options {:rankdir "LR"}))
 
 (defn all-shift-vars []
   (for [n (range n-nurses)
