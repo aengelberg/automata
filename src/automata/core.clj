@@ -3,7 +3,8 @@
         loco.core)
   (:require [clojure.java.io :as io]
             [loco.automata :as a]
-            [clojure.pprint :as pp]))
+            [clojure.pprint :as pp]
+            [clojure.string :as str]))
 
 
 
@@ -21,9 +22,9 @@
 ;;; SOLVING PROBLEMS WITH AUTOMATA, PART 2
 
 (def part2
-  ["How finite state machines have impacted Constraint Programming"
-   
-   "Code examples using Loco (my Constraint Programming library for Cloure)"])
+  ["What is Constraint Programming?"
+   "The 'regular' constraint"
+   "Code examples using Loco"])
 
 
 
@@ -53,14 +54,14 @@
 
 ;;; WHIRLWIND TOUR OF CONSTRAINT PROGRAMMING
 
-;; - CP is a new approach to Discrete Optimization
+;; - Constraint Programming (CP) uses propagators
 ;; - Loco provides a Clojure DSL to "Finite-Domain Integer Constraint Programming"
 ;; - Translation: only variables with *integer* values and bounded domains.
 
 ;; Example problem: find all X, Y, Z in [1, 10000] where X + Y + Z = 5.
 
 (defn find-solution-slow
-  "This is inefficient."
+  "This is inefficient (doesn't use Constraint Programming)"
   []
   (for [x (range 1 10000)
         y (range 1 10000)
@@ -108,9 +109,31 @@
                ($= 5 ($+ :x :y :z))]]
     (solutions model)))
 
-(time (find-solution-fast))
+(prn (time (find-solution-fast)))
 
-;;; Propagators avoid dumb choices
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+;;; The secret: propagators
 
 ;; - "X + Y + Z = 5" is a *propagator*
 ;; - It automagically "trims" the domains of variables
@@ -123,34 +146,32 @@
   Y in [1,10000]
   Z in [1,10000]
   X + Y + Z = 5
-  ;; Propagation magic: we know X, Y, and Z cannot go over 3 or
-  ;; there's no way to satisfy the constraint.
+  ;; Propagation magic: X <= 3, Y <= 3, Z <= 3
   X in [1,3]
   Y in [1,3]
   Z in [1,3]
   X + Y + Z = 5
-  ;; Now we do brute-force but with a much more reasonable model.
+  ;; Now we do brute-force
   ;; Case 1: X = 1
-  X in [1]
+  X in [1,1]
   Y in [1,3]
   Z in [1,3]
   X + Y + Z = 5
   ;; Case 1.1: Y = 1
-  X in [1]
-  Y in [1]
+  X in [1,1]
+  Y in [1,1]
   Z in [1,3]
   X + Y + Z = 5
-  ;; Propagation magic: Z must be 3
-  X in [1]
-  Y in [1]
-  Z in [3]
+  ;; Propagation magic: Z = 3
+  X in [1,1]
+  Y in [1,1]
+  Z in [3,3]
   X + Y + Z = 5
-  ;; This is a valid solution! Return this and keep going
-  ;; (backtracking if necessary).
+  ;; All variables are singleton sets. success
   )
 
-;; Key idea: Adding simple propagators in between search decisions is
-;; very powerful.
+;; Key idea (tip of the iceberg):
+;; search + propagation = very powerful
 
 
 
@@ -184,9 +205,7 @@
 
 
 
-
-;; CP engines traditionally provide a rich set of constraints to model
-;; problems.
+;;; MORE CONSTRAINTS
 
 ;; - equality / inequality
 ($= :x :y) ($!= 5 :z) ($< :a 3)
@@ -207,7 +226,6 @@
 ;; - "nth"
 ($= ($nth [1 2 3] :x) 3) ; X must be 2
 
-;; Sometimes global constraints aren't enough
 
 
 
@@ -225,6 +243,222 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+;;; Check out the new "magic" constraint that can solve all your problems!
+
+(require '[loco.automata :as a])
+
+(comment ($regular <...> [:x :y :z])
+         ;; fill in the blank with a finite state machine
+         )
+
+;; 
+(def example (a/string->automaton "123+"))
+
+(comment
+  (require ')
+  (prn (a/string->automaton)))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+;; - Sudoku
+(comment
+  (solution [($in [:x 1 1] 1 9)
+             ($in [:x 1 2] 1 9)
+             ...
+             ($distinct [[:x 1 5]])]))
+
+(require '[loco.automata :as a])
+(def non-contiguous "0*1+0+1(0|1)*")
+
+(defn max-subsequence
+  "Finds the maximum sub-sequence in coll that matches a regex."
+  [coll regex]
+  (let [N (count coll)
+        ;; each var "bit[i]" is 1 iff coll[i] is included in the
+        ;; subsequence. We use [:bit i] as the variable names in the
+        ;; Loco implementation.
+        bit-vars (for [i (range N)]
+                   [:bit i])
+        bit-var-constraints (for [v bit-vars]
+                              ($in v 0 1))
+        regex-constraint ($regular (a/string->automaton regex)
+                                   bit-vars)
+        ;; we want to maximize bit[0] * coll[0] + bit[1] * coll[1] ...
+        var-to-maximize ($scalar bit-vars coll)
+        model (-> []
+                  (into bit-var-constraints)
+                  (conj regex-constraint))
+        sol (solution model
+                      :maximize var-to-maximize)]
+    (when sol
+      (let [bits (mapv #(sol [:bit %]) (range N))
+            included-indexes (filter #(= 1 (sol [:bit %])) (range N))
+            included-values (map (vec coll) included-indexes)]
+        {:bits bits
+         :subseq included-values
+         :sum (apply + included-values)}))))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+;; (I stole this example from the MiniZinc tutorial:
+;; http://www.minizinc.org/downloads/doc-latest/minizinc-tute.pdf)
+
+;; Problem: Determine seven nurses' schedules across 10 days.
+
+;; Each nurse can have a day shift, or night shift, or no shifts on a
+;; given day.
+
+;; CONSTRAINT #1: A nurse can't work more than 3 days in a row.
+;; CONSTRAINT #2: A nurse can't do more than 2 night shifts in a row.
+;; CONSTRAINT #3: There must be 3 day shifts and 2 night shifts
+;; covered in any given day.
+
+;; Example solution:
+;; d d d - d d d - n n
+;; d d d - d d d - n n
+;; d d - d d n - n d d
+;; n n - d n d - d d d
+;; n - d n n - d d d -
+;; - n n d - n n d - d
+;; - - n n - - n n - -
+
+(def n-nurses 7)
+(def n-days 10)
+
+(def minimum-day-shifts 3)
+(def minimum-night-shifts 2)
+
+(def day 0)
+(def night 2)
+(def nothing 1)
+
+(def shift-transition-map
+  {:q1 {nothing :q1
+        day :q2
+        night :q3}
+   :q2 {nothing :q1
+        day :q4
+        night :q4}
+   :q3 {nothing :q1
+        day :q4
+        night :q5}
+   :q4 {nothing :q1
+        day :q6
+        night :q6}
+   :q5 {nothing :q1
+        day :q6}
+   :q6 {nothing :q1}})
+
+(def shift-automaton
+  (a/map->automaton
+   shift-transition-map
+   :q1
+   #{:q1 :q2 :q3 :q4 :q5 :q6}))
+
+(comment
+  (use 'rhizome.viz)
+  (view-graph (keys shift-transition-map)
+              (into {} (for [[k v] shift-transition-map]
+                         [k (distinct (vals v))]))
+              :edge->descriptor (fn [src dest]
+                                  (let [m (shift-transition-map src)
+                                        inputs (map key (filter #(= dest (val %)) (seq m)))
+                                        inputs (map {day 'd night 'n nothing 'o} inputs)]
+                                    {:label (str/join "," inputs)}))
+              :node->descriptor (fn [n] {:label n})
+              :options {:rankdir "LR"}))
+
+(defn all-shift-vars []
+  (for [n (range n-nurses)
+        d (range n-days)]
+    [:shift n d]))
+
+(defn shift-var-declarations []
+  (for [v (all-shift-vars)]
+    ($in v [nothing day night])))
+
+(defn nurse-constraint
+  [nurse-id]
+  ;; This automaton covers constraint #1 and #2
+  (let [row (for [d (range n-days)]
+              [:shift nurse-id d])]
+    ($regular shift-automaton row)))
+
+(defn day-constraint
+  [day-id]
+  (let [column (for [n (range n-nurses)]
+                 [:shift n day-id])]
+    ($cardinality column {day minimum-day-shifts
+                          night minimum-night-shifts
+                          nothing (- n-nurses minimum-day-shifts minimum-night-shifts)}
+                  :total true)))
+
+(defn solve-nurse-shifts
+  []
+  (let [model (concat (shift-var-declarations)
+                      (map nurse-constraint (range n-nurses))
+                      (map day-constraint (range n-days)))
+        sol (solution model)]
+    (when sol
+      (println
+       (str/join "\n"
+         (for [n (range n-nurses)]
+           (str/join " "
+             (for [d (range n-days)]
+               ({nothing '-, day 'd, night 'n}
+                (sol [:shift n d]))))))))))
 
 
 
