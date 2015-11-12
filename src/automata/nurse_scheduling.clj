@@ -4,7 +4,8 @@
   (:require [clojure.java.io :as io]
             [loco.automata :as a]
             [clojure.pprint :as pp]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [automata.viz :refer [viz-transition-map]]))
 
 ;; (I stole this example from the MiniZinc tutorial:
 ;; http://www.minizinc.org/downloads/doc-latest/minizinc-tute.pdf)
@@ -68,21 +69,9 @@
    #{:q1 :q2 :q3 :q4 :q5 :q6}))
 
 (comment
-  (use 'rhizome.viz)
-  (view-graph
-   (keys shift-transition-map)
-   (into {} (for [[k v] shift-transition-map]
-              [k (distinct (vals v))]))
-   :edge->descriptor
-   (fn [src dest]
-     (let [m (shift-transition-map src)
-           inputs (map key (filter #(= dest (val %))
-                                   (seq m)))
-           inputs (map {day 'd night 'n nothing 'o}
-                       inputs)]
-       {:label (str/join "," inputs)}))
-   :node->descriptor (fn [n] {:label n})
-   :options {:rankdir "LR"}))
+  (viz-transition-map
+   shift-transition-map
+   {night 'n day 'd nothing 'o}))
 
 (defn all-shift-vars []
   (for [n (range n-nurses)
