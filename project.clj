@@ -5,4 +5,6 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [loco "0.3.1-SNAPSHOT"]
-                 [rhizome "0.2.5"]])
+                 [rhizome "0.2.5"]]
+  :plugins [[refactor-nrepl "1.1.0"]
+            [cider/cider-nrepl "0.9.1"]])
