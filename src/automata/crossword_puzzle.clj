@@ -5,7 +5,8 @@
             [loco.automata :as a]
             [clojure.pprint :as pp]
             [clojure.string :as str]
-            [automata.viz :refer [viz-dictionary-transitions]]))
+            [automata.viz :refer
+             [viz-dictionary-transitions]]))
 
 ;; Problem: Fill a crossword-puzzle-style grid with letters.
 
@@ -37,9 +38,7 @@
 (def all-words
   "118627 words of varying sizes. Contains very obscure words."
   (->> (slurp (io/resource "US.dic"))
-       (re-seq #"[a-z]+")
-       (partition 2) ; avoid memory overload
-       (map first)))
+       (re-seq #"[a-z]+")))
 
 (def N (count crossword-grid))
 (def M (count (first crossword-grid)))
@@ -148,24 +147,6 @@
 
 
 
-;; THE WORD CONSTRAINT - FAST APPROACH (with regular constraint)
-
-;; Sample DFA (parses the dictionary #{"dog" "cat"})
-(def sample-dictionary-transitions
-  {[] {(int \d) [\d]
-       (int \c) [\c]}
-   [\d] {(int \o) [\d \o]}
-   [\d \o] {(int \g) [\d \o \g]}
-   [\c] {(int \a) [\c \a]}
-   [\c \a] {(int \t) [\c \a \t]}})
-(def sample-dictionary-automaton
-  (a/map->automaton
-    sample-dictionary-transitions
-    []
-    #{[\d \o \g] [\c \a \t]}))
-
-(comment
-  (viz-dictionary-transitions sample-dictionary-transitions))
 
 ;; General functions to construct dictionary automata
 (defn dictionary->transitions
@@ -192,30 +173,16 @@
 
 (defn solve-crossword-with-automaton
   []
-  (let [_ (println "Generating automaton...")
-        a (time (dictionary->automaton all-words))
+  (let [_ (println "Generating automata...")
+        all-word-lengths (distinct (map count all-words))
+        automaton-per-length (time (into {} (for [i all-word-lengths]
+                                              [i (dictionary->automaton
+                                                  (filter #(= (count %) i)
+                                                          all-words))])))
         _ (println "Solving...")
         sol (time (solution (concat base-model
-                                    (map (partial word-constraint-fast a)
+                                    (map #(word-constraint-fast
+                                           (automaton-per-length (count %))
+                                           %)
                                          (concat across down)))))]
     (ppr (format-grid sol))))
-
-(comment
-
-  (def words-by-length (group-by count all-words))
-
-  (time
-   (def automata-by-length
-     "Creating a separate automaton for each length of word"
-     (into {} (for [[k words] words-by-length]
-                [k (dictionary->automaton words)]))))
-
-  (def crossword-model
-    (concat base-model
-            (map word-constraint (concat across down))))
-
-  (time
-   (-> (solution crossword-model)
-       format-grid
-       ppr))
-  )

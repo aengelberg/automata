@@ -6,5 +6,6 @@
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [loco "0.3.1-SNAPSHOT"]
                  [rhizome "0.2.5"]]
+  :jvm-opts ^:replace ["-server" "-Xmx4g"]
   :plugins [[refactor-nrepl "1.1.0"]
             [cider/cider-nrepl "0.9.1"]])
