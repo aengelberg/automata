@@ -13,9 +13,10 @@
 ;; CONSTRAINT: Each row or column must spell a valid word.
 
 (def all-words
-  "5757 five-letter words in descending order of frequency."
+  "The 2000 most common 5-letter words."
   (->> (slurp (io/resource "sgb-words.txt"))
-       (re-seq #"[a-z]+")))
+       (re-seq #"[a-z]+")
+       (take 2000)))
 
 
 
@@ -55,7 +56,9 @@
          (for [possible-word all-words]
            (apply $and
                   (for [[cell character]
-                        (map vector cells possible-word)]
+                        (map vector
+                             cells
+                             possible-word)]
                     ($= cell (int character)))))))
 
 
@@ -79,7 +82,8 @@
     #{[\d \o \g] [\c \a \t]}))
 
 (comment
-  (viz-dictionary-transitions sample-dictionary-transitions))
+  (viz-dictionary-transitions
+   sample-dictionary-transitions))
 
 
 ;; General functions to construct dictionary automata
@@ -88,8 +92,9 @@
   (apply merge-with merge
          (for [word dict
                i (range (count word))]
-           {(vec (take i word)) {(int (nth word i))
-                                 (vec (take (inc i) word))}})))
+           {(vec (take i word))
+            {(int (nth word i))
+             (vec (take (inc i) word))}})))
 (defn dictionary->automaton
   [dict]
   (let [transitions (dictionary->transitions dict)
@@ -110,7 +115,8 @@
         a (dictionary->automaton all-words)
         _ (println "Solving puzzle...")
         model (concat base-model
-                      ;; add an element of asymmetry so we don't get a
+                      ;; add an element of asymmetry
+                      ;; so we don't get a
                       ;; fully symmetric solution
                       [($!= [:cell 0 4] [:cell 4 0])]
                       (for [row (partition 5 all-vars)]

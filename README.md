@@ -1,14 +1,5 @@
-# automata
+# Solving Problems With Automata, Part 2
 
-A Clojure library designed to ... well, that part is up to you.
-
-## Usage
-
-FIXME
-
-## License
-
-Copyright © 2015 FIXME
-
-Distributed under the Eclipse Public License either version 1.0 or (at
-your option) any later version.
+- Nurse Scheduling problem: `src/automata/nurse_scheduling.clj`
+- Crossword Puzzle (simplified): `src/automata/crossword_puzzle_5x5.clj`
+- Crossword Puzzle (full grid): `src/automata/crossword_puzzle.clj`
