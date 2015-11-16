@@ -6,7 +6,7 @@
             [clojure.pprint :as pp]
             [clojure.string :as str]
             [automata.viz :refer
-             [viz-dictionary-transitions]]))
+             [viz-automaton]]))
 
 ;; Problem: Fill a 5x5 grid with letters.
 
@@ -69,22 +69,20 @@
 
 ;; Sample DFA (parses the dictionary #{"dog" "cat"})
 (def sample-dictionary-transitions
-  {[] {(int \d) [\d]
-       (int \c) [\c]}
-   [\d] {(int \o) [\d \o]}
-   [\d \o] {(int \g) [\d \o \g]}
-   [\c] {(int \a) [\c \a]}
-   [\c \a] {(int \t) [\c \a \t]}})
+  {"" {(int \d) "d"
+       (int \c) "c"}
+   "d" {(int \o) "do"
+        (int \u) "du"}
+   "do" {(int \g) "dog"}
+   "c" {(int \a) "ca"}
+   "ca" {(int \t) "cat"}
+   "du" {(int \c) "duc"}
+   "duc" {(int \k) "duck"}})
 (def sample-dictionary-automaton
   (a/map->automaton
     sample-dictionary-transitions
-    []
-    #{[\d \o \g] [\c \a \t]}))
-
-(comment
-  (viz-dictionary-transitions
-   sample-dictionary-transitions))
-
+    ""
+    #{"dog" "cat" "duck"}))
 
 ;; General functions to construct dictionary automata
 (defn dictionary->transitions
@@ -92,17 +90,25 @@
   (apply merge-with merge
          (for [word dict
                i (range (count word))]
-           {(vec (take i word))
+           {(subs word 0 i)
             {(int (nth word i))
-             (vec (take (inc i) word))}})))
+             (subs word 0 (inc i))}})))
 (defn dictionary->automaton
   [dict]
   (let [transitions (dictionary->transitions dict)
-        accepting-states (for [word dict]
-                           (vec word))]
+        accepting-states (set dict)]
     (a/map->automaton transitions
-                      []
+                      ""
                       accepting-states)))
+
+(comment ; ignore this
+  (viz-automaton
+   (apply merge-with merge
+          (for [[src m] (dictionary->transitions ["dog" "cat" "duck"])
+                [i dest] m]
+            {src {(char i) dest}}))
+   ""
+   #{"dog" "cat" "duck"}))
 
 (defn fast-word-constraint
   [automaton sequence]

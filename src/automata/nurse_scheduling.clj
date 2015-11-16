@@ -5,9 +5,10 @@
             [loco.automata :as a]
             [clojure.pprint :as pp]
             [clojure.string :as str]
-            [automata.viz :refer [viz-transition-map]]))
+            [automata.viz :refer [viz-automaton
+                                  transform-inputs]]))
 
-;; (I stole this example from the MiniZinc tutorial:
+;; (This example can be found on the MiniZinc tutorial:
 ;; http://www.minizinc.org/downloads/doc-latest/minizinc-tute.pdf)
 
 ;; Problem: Determine seven nurses' schedules across 10 days.
@@ -15,19 +16,32 @@
 ;; Each nurse can have a day shift, or night shift, or no shifts on a
 ;; given day.
 
-;; CONSTRAINT #1: A nurse can't work more than 3 days in a row.
-;; CONSTRAINT #2: A nurse can't do more than 2 night shifts in a row.
-;; CONSTRAINT #3: There must be 3 day shifts and 2 night shifts
-;; covered in any given day.
+;; CONSTRAINT #1: There must be 3 nurses on day shifts and 2 nurses on
+;; night shifts on any given date.
+;; CONSTRAINT #2: A nurse can't work more than 3 dates in a row.
+;; CONSTRAINT #3: A nurse can't do more than 2 night shifts in a row.
 
-;; Example solution:
-;; d d d - d d d - n n
-;; d d d - d d d - n n
-;; d d - d d n - n d d
-;; n n - d n d - d d d
-;; n - d n n - d d d -
-;; - n n d - n n d - d
-;; - - n n - - n n - -
+(comment
+  ;; Example solution:
+  +--------+--+--+--+--+--+--+--+--+--+--+
+  |        |D0|D1|D2|D3|D4|D5|D6|D7|D8|D9|
+  +--------+--+--+--+--+--+--+--+--+--+--+
+  |Nurse 0 |d |d |d |  |d |d |d |  |n |n |
+  +--------+--+--+--+--+--+--+--+--+--+--+
+  |Nurse 1 |d |d |d |  |d |d |d |  |n |n |
+  +--------+--+--+--+--+--+--+--+--+--+--+
+  |Nurse 2 |d |d |  |d |d |n |  |n |d |d |
+  +--------+--+--+--+--+--+--+--+--+--+--+
+  |Nurse 3 |n |n |  |d |n |d |  |d |d |d |
+  +--------+--+--+--+--+--+--+--+--+--+--+
+  |Nurse 4 |n |  |d |n |n |  |d |d |d |  |
+  +--------+--+--+--+--+--+--+--+--+--+--+
+  |Nurse 5 |  |n |n |d |  |n |n |d |  |d |
+  +--------+--+--+--+--+--+--+--+--+--+--+
+  |Nurse 6 |  |  |n |n |  |  |n |n |  |  |
+  +--------+--+--+--+--+--+--+--+--+--+--+
+  ;; (d = 1, n = 2, blank = 0)
+  )
 
 (def n-nurses 7)
 (def n-days 10)
@@ -41,9 +55,9 @@
 
 ;; there are 7 (nurses) * 10 (days) = 70 variables.-
 
-(def day 0)
-(def night 1)
-(def nothing 2)
+(def day 1)
+(def night 2)
+(def nothing 0)
 
 (def shift-transition-map
   {:q1 {nothing :q1
@@ -69,9 +83,13 @@
    #{:q1 :q2 :q3 :q4 :q5 :q6}))
 
 (comment
-  (viz-transition-map
-   shift-transition-map
-   {night 'n day 'd nothing 'o}))
+  (viz-automaton
+   (transform-inputs shift-transition-map
+                     {night 'n
+                      day 'd
+                      nothing (with-meta 'o {:dotted true})})
+   :q1
+   #{:q1 :q2 :q3 :q4 :q5 :q6}))
 
 (defn all-shift-vars []
   (for [n (range n-nurses)
@@ -84,7 +102,7 @@
 
 (defn nurse-constraint
   [nurse-id]
-  ;; This automaton covers constraint #1 and #2
+  ;; This automaton covers constraint #2 and #3
   (let [row (for [d (range n-days)]
               [:shift nurse-id d])]
     ($regular shift-automaton row)))
