@@ -114,7 +114,7 @@
     ($cardinality column {day minimum-day-shifts
                           night minimum-night-shifts
                           nothing (- n-nurses minimum-day-shifts minimum-night-shifts)}
-                  :total true)))
+                  :closed true)))
 
 (defn solve-nurse-shifts
   []
